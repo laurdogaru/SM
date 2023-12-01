@@ -1,4 +1,4 @@
-// Usage: "mpirun -np X mpi Y", where X is the number of processes and Y
+// Usage: "mpirun -np X scan_mpi Y", where X is the number of processes and Y
 // should be a number from 0 to 9 and represents which input file will be used
 #include <mpi.h>
 #include <stdio.h>
@@ -65,21 +65,52 @@ int main(int argc, char* argv[])
                 MPI_DOUBLE, i, 0,
                 MPI_COMM_WORLD);
 
+        double **partial_sums = (double**)malloc(np * sizeof(double*));
+        for(int i = 0; i < np; i++) {
+            partial_sums[i] = (double*)malloc(elements_per_process * sizeof(double));
+        }
+
 		// master process add its own sub array
 		double sum = 0;
-		for (i = 0; i < elements_per_process; i++)
+		for (i = 0; i < elements_per_process; i++) {
 			sum += a[i];
+            partial_sums[0][i] = sum;
+        }
 
-		// collects partial sums from other processes
+
+		// collects partial sums from other processes. Every array of partial
+        // sums is stored in the corresponding line from the matrix
 		double tmp;
 		for (i = 1; i < np; i++) {
-			MPI_Recv(&tmp, 1, MPI_DOUBLE, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD,
-            &status);
-			sum += tmp;
+            if(i != np - 1) {
+                MPI_Recv(partial_sums[i], elements_per_process, MPI_DOUBLE, i,
+                0, MPI_COMM_WORLD, &status);
+            } else {
+                MPI_Recv(partial_sums[i], elements_left, MPI_DOUBLE, i,
+                0, MPI_COMM_WORLD, &status);
+            }
 		}
 
+        for(i = 1; i < np - 1; i++) {
+            double x = partial_sums[i-1][elements_per_process - 1];
+            for(int j = 0; j < elements_per_process; j++) {
+                partial_sums[i][j] += x;
+            }
+        }
+        double x = partial_sums[np - 2][elements_per_process - 1];
+        for(int j = 0; j < elements_left; j++) {
+            partial_sums[np - 1][j] += x;
+        }
+
 		// prints the final sum of array
-		printf("Sum of array is : %lf\n", sum);
+		printf("Sum of array is : %lf\n", partial_sums[np - 1][elements_left - 1]);
+        // printf("Partial sums: ");
+        // for(int i = 0; i < np - 1; i++) {
+        //     for(int j = 0; j < elements_per_process; j++) {
+        //         printf("%lf ", partial_sums[i][j]);
+        //     }
+        // }
+        puts("");
 	}
 	// slave processes
 	else {
@@ -88,7 +119,7 @@ int main(int argc, char* argv[])
 				MPI_COMM_WORLD,
 				&status);
 
-        a2 = (double*)malloc(n_elements_recieved * 2 * sizeof(double));
+        a2 = (double*)malloc(n_elements_recieved * sizeof(double));
 
         // a2 stores the received array segment
 		MPI_Recv(a2, n_elements_recieved,
@@ -97,16 +128,17 @@ int main(int argc, char* argv[])
 				&status);
 
 		// calculates its partial sum
-		double partial_sum = 0;
 		for (int i = 0; i < n_elements_recieved; i++) {
             sleep(0.001);
-			partial_sum += a2[i];
+            if(i > 0) {
+                a2[i] += a2[i-1];
+            }
         }
 
 		// sends the partial sum to the root process
-		MPI_Send(&partial_sum, 1, MPI_DOUBLE,
+		MPI_Send(a2, n_elements_recieved, MPI_DOUBLE,
 				0, 0, MPI_COMM_WORLD);
-        free(a2);
+        // free(a2);
 	}
 
 	// cleans up all MPI state before exit of process

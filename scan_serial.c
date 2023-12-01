@@ -1,4 +1,4 @@
-// Usage: "./serial X", where X should be a number from 0 to 9 and represents
+// Usage: "./scan_serial X", where X should be a number from 0 to 9 and represents
 // which input file will be used
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,7 +20,6 @@ int main(int argc, char *argv[]) {
 
     for(int i = 0; i < n; i++) {
         fscanf(fp, "%lf", &a[i]);
-        a[i] = 1.0f;
     }
 
     for(int i = 1; i < n; i++) {

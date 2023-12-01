@@ -1,7 +1,8 @@
 build:
-	gcc serial.c -o serial
+	gcc scan_serial.c -o scan_serial
 	gcc gen_inputs.c -lm -o gen_inputs
-	mpicc mpi_scan.c -o mpi_scan
-	mpicc mpi.c -o mpi
+	gcc -o scan_omp scan_omp.c -fopenmp
+	mpicc scan_mpi.c -o scan_mpi -g
+	mpicc scan_mpi_omp.c -o scan_mpi_omp -fopenmp
 clean:
-	rm serial gen_inputs && rm *.txt
+	rm scan_serial gen_inputs scan_mpi scan_omp scan_mpi_omp && rm *.txt
